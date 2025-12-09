@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  GUEST
+  OWNER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+}
+
+model User {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+
+  ownedRooms Room[]    @relation("RoomOwner")
+  bookings   Booking[] @relation("GuestBookings")
+
+  @@index([name], map: "users_name_index")
+  @@map("users")
+}
+
+model Room {
+  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String   @db.VarChar(255)
+  description   String   @db.Text
+  pricePerNight Decimal  @map("price_per_night") @db.Decimal(10, 2)
+  ownerId       BigInt   @map("owner_id") @db.UnsignedBigInt
+  location      String?  @db.VarChar(255)
+  maxGuests     Int?     @map("max_guests") @db.UnsignedInt
+  createdAt     DateTime @default(now()) @map("created_at")
+  isDeleted     Boolean  @default(false) @map("is_deleted")
+
+  owner    User      @relation("RoomOwner", fields: [ownerId], references: [id])
+  bookings Booking[]
+
+  @@map("rooms")
+}
+
+model Booking {
+  id            BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  roomId        BigInt        @map("room_id") @db.UnsignedBigInt
+  guestId       BigInt        @map("guest_id") @db.UnsignedBigInt
+  checkInDate   DateTime      @map("check_in_date")
+  checkOutDate  DateTime      @map("check_out_date")
+  totalPrice    Decimal       @map("total_price") @db.Decimal(8, 2)
+  status        BookingStatus @default(PENDING)
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  room  Room @relation(fields: [roomId], references: [id])
+  guest User @relation("GuestBookings", fields: [guestId], references: [id])
+
+  @@index([roomId, checkInDate, checkOutDate], map: "bookings_room_date_idx")
+  @@map("bookings")
+}
